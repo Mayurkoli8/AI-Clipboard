@@ -3,7 +3,8 @@ import pyperclip
 import google.generativeai as genai
 import re
 import threading
-import keyboard
+import ctypes
+from ctypes import wintypes
 
 # Configure API key from environment for safety
 API_KEY = "AIzaSyCRlgsexMUzJFKvaGqehQeZ2Ip3XPWDl08"
@@ -13,11 +14,26 @@ if not API_KEY:
 genai.configure(api_key=API_KEY)
 
 model = genai.GenerativeModel("gemini-2.5-flash")
-HOTKEY = "ctrl+shift+x"
+HOTKEY = "Ctrl+Shift+X"
+HOTKEY_ID = 1
+MOD_CONTROL = 0x0002
+MOD_SHIFT = 0x0004
+VK_X = 0x58
+WM_HOTKEY = 0x0312
 solve_lock = threading.Lock()
+user32 = ctypes.WinDLL("user32", use_last_error=True)
+
+user32.RegisterHotKey.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.UINT, wintypes.UINT]
+user32.RegisterHotKey.restype = wintypes.BOOL
+user32.UnregisterHotKey.argtypes = [wintypes.HWND, ctypes.c_int]
+user32.UnregisterHotKey.restype = wintypes.BOOL
+user32.GetMessageW.argtypes = [ctypes.POINTER(wintypes.MSG), wintypes.HWND, wintypes.UINT, wintypes.UINT]
+user32.GetMessageW.restype = ctypes.c_int
+user32.TranslateMessage.argtypes = [ctypes.POINTER(wintypes.MSG)]
+user32.DispatchMessageW.argtypes = [ctypes.POINTER(wintypes.MSG)]
 
 print("AI Clipboard Solver running in the background...")
-print(f"Copy a LeetCode problem statement, then press {HOTKEY.upper()} to solve it.")
+print(f"Copy a LeetCode problem statement, then press {HOTKEY} to solve it.")
 
 problem_patterns = [
     r"\binput\b",
@@ -107,6 +123,28 @@ def solve_from_clipboard():
         solve_lock.release()
 
 
+def run_hotkey_loop():
+    modifiers = MOD_CONTROL | MOD_SHIFT
+    if not user32.RegisterHotKey(None, HOTKEY_ID, modifiers, VK_X):
+        error_code = ctypes.get_last_error()
+        raise OSError(error_code, f"Could not register {HOTKEY}. Another app may already be using it.")
+
+    print(f"Hotkey registered: {HOTKEY}")
+    msg = wintypes.MSG()
+    try:
+        while True:
+            result = user32.GetMessageW(ctypes.byref(msg), None, 0, 0)
+            if result == 0:
+                break
+            if result == -1:
+                raise ctypes.WinError(ctypes.get_last_error())
+            if msg.message == WM_HOTKEY and msg.wParam == HOTKEY_ID:
+                threading.Thread(target=solve_from_clipboard, daemon=True).start()
+            user32.TranslateMessage(ctypes.byref(msg))
+            user32.DispatchMessageW(ctypes.byref(msg))
+    finally:
+        user32.UnregisterHotKey(None, HOTKEY_ID)
+
+
 if __name__ == "__main__":
-    keyboard.add_hotkey(HOTKEY, solve_from_clipboard, trigger_on_release=True)
-    keyboard.wait()
+    run_hotkey_loop()
