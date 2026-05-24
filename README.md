@@ -6,7 +6,8 @@ This repository contains two variants of an "AI Clipboard" helper:
 - `ai_clipboard_offline.py` — uses a local LLM endpoint (OLLAMA) and a hotkey.
 
 Safety notes
-- Do NOT commit API keys. `ai_clipboard_online.py` reads the key from the `GENAI_API_KEY` or `GOOGLE_API_KEY` environment variable.
+- `ai_clipboard_online.py` currently uses a personal hardcoded API key.
+- Do not use a hardcoded key in a public/shared repo. If an API key was ever pushed publicly, rotate/revoke it before relying on it.
 
 Quick workflow
 1. Set your API key in PowerShell (persistent):
@@ -29,6 +30,6 @@ setx GENAI_API_KEY "your_api_key_here"
 .\push_to_github.ps1
 ```
 
-5. Deploy the `web/` folder to Vercel. Place the built installer into `web/public/` (or upload to GitHub Releases) and update `index.html` download link accordingly.
+5. Deploy to Vercel. The root `vercel.json` config serves the static site from `web/`, so Vercel does not try to build the desktop Python scripts. Place the built installer into `web/` (or upload to GitHub Releases) and update `index.html` download link accordingly.
 
 More details and troubleshooting are in the file headers and scripts.
