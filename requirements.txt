@@ -1,5 +1,5 @@
 pyperclip
-google-generative-ai
+google-generativeai
 requests
 keyboard
 pyinstaller

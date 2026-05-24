@@ -9,6 +9,7 @@ dist/
 build/
 *.spec
 *.exe
+!web/*.exe
 *.zip
 _MEI*/
 public/ai_clipboard_* 
