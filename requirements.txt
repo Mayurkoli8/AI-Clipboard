@@ -1,0 +1,5 @@
+pyperclip
+google-generative-ai
+requests
+keyboard
+pyinstaller
