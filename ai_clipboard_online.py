@@ -1,8 +1,9 @@
 ﻿import os
 import pyperclip
 import google.generativeai as genai
-import time
 import re
+import threading
+import keyboard
 
 # Configure API key from environment for safety
 API_KEY = "AIzaSyCRlgsexMUzJFKvaGqehQeZ2Ip3XPWDl08"
@@ -12,9 +13,11 @@ if not API_KEY:
 genai.configure(api_key=API_KEY)
 
 model = genai.GenerativeModel("gemini-2.5-flash")
+HOTKEY = "ctrl+shift+x"
+solve_lock = threading.Lock()
 
-print("AI Clipboard Solver Running silently in the background...")
-print("Copy a LeetCode problem statement and the script will solve it automatically.")
+print("AI Clipboard Solver running in the background...")
+print(f"Copy a LeetCode problem statement, then press {HOTKEY.upper()} to solve it.")
 
 problem_patterns = [
     r"\binput\b",
@@ -73,32 +76,37 @@ def solve_problem(problem_text: str) -> str:
     return result.strip()
 
 
-def watch_clipboard():
-    last_text = ""
-    try:
-        last_text = pyperclip.paste()
-    except Exception:
-        last_text = ""
+def solve_from_clipboard():
+    if not solve_lock.acquire(blocking=False):
+        print("Solve already running. Please wait.")
+        return
 
-    while True:
+    try:
         try:
             current_text = pyperclip.paste()
         except Exception as e:
             print("Clipboard read failed:", e)
-            time.sleep(0.5)
-            continue
+            return
 
-        if current_text != last_text:
-            last_text = current_text
-            if current_text.strip() and looks_like_leetcode_problem(current_text):
-                try:
-                    solution = solve_problem(current_text)
-                    pyperclip.copy(solution)
-                    print("Solved clipboard problem and copied solution to clipboard.")
-                except Exception as e:
-                    print("Solve failed:", e)
-        time.sleep(0.5)
+        if not current_text.strip():
+            print("Clipboard is empty.")
+            return
+
+        if not looks_like_leetcode_problem(current_text):
+            print("Clipboard does not look like a LeetCode-style problem.")
+            return
+
+        try:
+            print("Solving clipboard problem...")
+            solution = solve_problem(current_text)
+            pyperclip.copy(solution)
+            print("Solved and copied solution to clipboard.")
+        except Exception as e:
+            print("Solve failed:", e)
+    finally:
+        solve_lock.release()
 
 
 if __name__ == "__main__":
-    watch_clipboard()
+    keyboard.add_hotkey(HOTKEY, solve_from_clipboard, trigger_on_release=True)
+    keyboard.wait()
