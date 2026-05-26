@@ -68,8 +68,8 @@ if (-not (Test-Path $VenvPython)) {
 Invoke-VenvPython -m pip install --upgrade pip
 Invoke-VenvPython -m pip install -r requirements.txt
 
-# Build online clipboard EXE
-Invoke-VenvPython -m PyInstaller --onefile --name ai_clipboard_online ai_clipboard_online.py
+# Build online clipboard EXE as a background app with no console window.
+Invoke-VenvPython -m PyInstaller --onefile --windowed --name ai_clipboard_online ai_clipboard_online.py
 
 # Build offline clipboard EXE (hotkey)
 Invoke-VenvPython -m PyInstaller --onefile --name ai_clipboard_offline ai_clipboard_offline.py

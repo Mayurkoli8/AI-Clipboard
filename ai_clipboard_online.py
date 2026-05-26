@@ -1,4 +1,7 @@
 ﻿import os
+import sys
+import traceback
+from datetime import datetime
 import pyperclip
 import google.generativeai as genai
 import re
@@ -22,6 +25,8 @@ VK_X = 0x58
 WM_HOTKEY = 0x0312
 solve_lock = threading.Lock()
 user32 = ctypes.WinDLL("user32", use_last_error=True)
+LOG_DIR = os.path.join(os.getenv("LOCALAPPDATA") or os.path.expanduser("~"), "AI Clipboard")
+LOG_FILE = os.path.join(LOG_DIR, "ai_clipboard_online.log")
 
 user32.RegisterHotKey.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.UINT, wintypes.UINT]
 user32.RegisterHotKey.restype = wintypes.BOOL
@@ -31,9 +36,30 @@ user32.GetMessageW.argtypes = [ctypes.POINTER(wintypes.MSG), wintypes.HWND, wint
 user32.GetMessageW.restype = ctypes.c_int
 user32.TranslateMessage.argtypes = [ctypes.POINTER(wintypes.MSG)]
 user32.DispatchMessageW.argtypes = [ctypes.POINTER(wintypes.MSG)]
+user32.MessageBoxW.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.UINT]
+user32.MessageBoxW.restype = ctypes.c_int
 
-print("AI Clipboard Solver running in the background...")
-print(f"Copy a LeetCode problem statement, then press {HOTKEY} to solve it.")
+
+def log(message: str):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"[{timestamp}] {message}"
+    try:
+        os.makedirs(LOG_DIR, exist_ok=True)
+        with open(LOG_FILE, "a", encoding="utf-8") as log_file:
+            log_file.write(line + "\n")
+    except Exception:
+        pass
+
+    if sys.stdout:
+        print(message)
+
+
+def show_error(message: str):
+    user32.MessageBoxW(None, message, "AI Clipboard", 0x00000010)
+
+
+log("AI Clipboard Solver running in the background...")
+log(f"Copy a LeetCode problem statement, then press {HOTKEY} to solve it.")
 
 problem_patterns = [
     r"\binput\b",
@@ -94,31 +120,31 @@ def solve_problem(problem_text: str) -> str:
 
 def solve_from_clipboard():
     if not solve_lock.acquire(blocking=False):
-        print("Solve already running. Please wait.")
+        log("Solve already running. Please wait.")
         return
 
     try:
         try:
             current_text = pyperclip.paste()
         except Exception as e:
-            print("Clipboard read failed:", e)
+            log(f"Clipboard read failed: {e}")
             return
 
         if not current_text.strip():
-            print("Clipboard is empty.")
+            log("Clipboard is empty.")
             return
 
         if not looks_like_leetcode_problem(current_text):
-            print("Clipboard does not look like a LeetCode-style problem.")
+            log("Clipboard does not look like a LeetCode-style problem.")
             return
 
         try:
-            print("Solving clipboard problem...")
+            log("Solving clipboard problem...")
             solution = solve_problem(current_text)
             pyperclip.copy(solution)
-            print("Solved and copied solution to clipboard.")
+            log("Solved and copied solution to clipboard.")
         except Exception as e:
-            print("Solve failed:", e)
+            log(f"Solve failed: {e}")
     finally:
         solve_lock.release()
 
@@ -129,7 +155,7 @@ def run_hotkey_loop():
         error_code = ctypes.get_last_error()
         raise OSError(error_code, f"Could not register {HOTKEY}. Another app may already be using it.")
 
-    print(f"Hotkey registered: {HOTKEY}")
+    log(f"Hotkey registered: {HOTKEY}")
     msg = wintypes.MSG()
     try:
         while True:
@@ -147,4 +173,8 @@ def run_hotkey_loop():
 
 
 if __name__ == "__main__":
-    run_hotkey_loop()
+    try:
+        run_hotkey_loop()
+    except Exception as e:
+        log(traceback.format_exc())
+        show_error(f"{e}\n\nLog file:\n{LOG_FILE}")
