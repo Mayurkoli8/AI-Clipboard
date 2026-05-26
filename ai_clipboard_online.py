@@ -2,6 +2,9 @@
 import sys
 import traceback
 from datetime import datetime
+import ast
+import io
+import tokenize
 import pyperclip
 import google.generativeai as genai
 import re
@@ -101,12 +104,57 @@ def build_prompt(problem_text: str) -> str:
     return f"""
 You are an expert competitive programmer solving a LeetCode-style algorithm problem.
 Write clean, efficient Python 3 code that passes LeetCode constraints.
-Do not include any markdown, comments, explanation, or extra text.
+Do not include any markdown, comments, docstrings, explanation, or extra text.
 Do not include input/output code, test cases, or `if __name__ == '__main__':`.
 Return only the function or class implementation required for the problem.
 Problem:
 {problem_text}
 """
+
+
+class DocstringRemover(ast.NodeTransformer):
+    def strip_docstring(self, node):
+        if (
+            node.body
+            and isinstance(node.body[0], ast.Expr)
+            and isinstance(node.body[0].value, ast.Constant)
+            and isinstance(node.body[0].value.value, str)
+        ):
+            node.body = node.body[1:]
+        if not node.body and not isinstance(node, ast.Module):
+            node.body = [ast.Pass()]
+        return node
+
+    def visit_Module(self, node):
+        self.generic_visit(node)
+        return self.strip_docstring(node)
+
+    def visit_ClassDef(self, node):
+        self.generic_visit(node)
+        return self.strip_docstring(node)
+
+    def visit_FunctionDef(self, node):
+        self.generic_visit(node)
+        return self.strip_docstring(node)
+
+    def visit_AsyncFunctionDef(self, node):
+        self.generic_visit(node)
+        return self.strip_docstring(node)
+
+
+def strip_generated_comments(code: str) -> str:
+    tokens = tokenize.generate_tokens(io.StringIO(code).readline)
+    without_comments = tokenize.untokenize(
+        token for token in tokens if token.type != tokenize.COMMENT
+    )
+
+    try:
+        tree = ast.parse(without_comments)
+        tree = DocstringRemover().visit(tree)
+        ast.fix_missing_locations(tree)
+        return ast.unparse(tree)
+    except SyntaxError:
+        return without_comments
 
 
 def solve_problem(problem_text: str) -> str:
@@ -115,7 +163,7 @@ def solve_problem(problem_text: str) -> str:
     result = response.text.strip()
     result = result.replace("```python", "")
     result = result.replace("```", "")
-    return result.strip()
+    return strip_generated_comments(result).strip()
 
 
 def solve_from_clipboard():
