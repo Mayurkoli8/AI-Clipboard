@@ -13,3 +13,5 @@ build/
 *.zip
 _MEI*/
 public/ai_clipboard_* 
+.vercel
+.env*

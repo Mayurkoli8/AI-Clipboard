@@ -6,22 +6,19 @@ import ast
 import io
 import tokenize
 import pyperclip
-import google.generativeai as genai
+import requests
 import re
 import threading
 import ctypes
 from ctypes import wintypes
 
-# Configure API key from environment for safety
-API_KEY = os.getenv("GENAI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-genai.configure(api_key=API_KEY)
-
-model = genai.GenerativeModel("gemini-flash-latest")
+# Gemini is called through our Vercel function, which holds the API key.
+SOLVE_URL = "https://ai-clipboard.vercel.app/api/solve"
 HOTKEY = "Ctrl+Shift+M"
 HOTKEY_ID = 1
 MOD_CONTROL = 0x0002
 MOD_SHIFT = 0x0004
-VK_X = 0x58
+VK_M = 0x4D
 WM_HOTKEY = 0x0312
 solve_lock = threading.Lock()
 user32 = ctypes.WinDLL("user32", use_last_error=True)
@@ -97,18 +94,6 @@ def looks_like_leetcode_problem(text: str) -> bool:
     return score >= 2
 
 
-def build_prompt(problem_text: str) -> str:
-    return f"""
-You are an expert competitive programmer solving a LeetCode-style algorithm problem.
-Write clean, efficient Python 3 code that passes LeetCode constraints.
-Do not include any markdown, comments, docstrings, explanation, or extra text.
-Do not include input/output code, test cases, or `if __name__ == '__main__':`.
-Return only the function or class implementation required for the problem.
-Problem:
-{problem_text}
-"""
-
-
 class DocstringRemover(ast.NodeTransformer):
     def strip_docstring(self, node):
         if (
@@ -155,9 +140,14 @@ def strip_generated_comments(code: str) -> str:
 
 
 def solve_problem(problem_text: str) -> str:
-    prompt = build_prompt(problem_text)
-    response = model.generate_content(prompt)
-    result = response.text.strip()
+    response = requests.post(SOLVE_URL, json={"problem": problem_text}, timeout=120)
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+    if not response.ok:
+        raise RuntimeError(data.get("error") or f"Server returned HTTP {response.status_code}")
+    result = data["solution"].strip()
     result = result.replace("```python", "")
     result = result.replace("```", "")
     return strip_generated_comments(result).strip()
@@ -196,7 +186,7 @@ def solve_from_clipboard():
 
 def run_hotkey_loop():
     modifiers = MOD_CONTROL | MOD_SHIFT
-    if not user32.RegisterHotKey(None, HOTKEY_ID, modifiers, VK_X):
+    if not user32.RegisterHotKey(None, HOTKEY_ID, modifiers, VK_M):
         error_code = ctypes.get_last_error()
         raise OSError(error_code, f"Could not register {HOTKEY}. Another app may already be using it.")
 
@@ -219,8 +209,6 @@ def run_hotkey_loop():
 
 if __name__ == "__main__":
     try:
-        if not API_KEY:
-            raise RuntimeError("GENAI_API_KEY (or GOOGLE_API_KEY) environment variable not set.\nSet it before running: setx GENAI_API_KEY \"your_key\" and restart the app.")
         run_hotkey_loop()
     except Exception as e:
         log(traceback.format_exc())
