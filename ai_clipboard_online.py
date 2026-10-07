@@ -17,7 +17,7 @@ API_KEY = os.getenv("GENAI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=API_KEY)
 
 model = genai.GenerativeModel("gemini-flash-latest")
-HOTKEY = "Ctrl+Shift+X"
+HOTKEY = "Ctrl+Shift+M"
 HOTKEY_ID = 1
 MOD_CONTROL = 0x0002
 MOD_SHIFT = 0x0004
