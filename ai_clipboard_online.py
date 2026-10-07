@@ -13,10 +13,7 @@ import ctypes
 from ctypes import wintypes
 
 # Configure API key from environment for safety
-API_KEY = "AIzaSyCRlgsexMUzJFKvaGqehQeZ2Ip3XPWDl08"
-if not API_KEY:
-    raise SystemExit("GENAI_API_KEY (or GOOGLE_API_KEY) environment variable not set.\nSet it before running: `setx GENAI_API_KEY \"your_key\"` and reopen the shell.")
-
+API_KEY = os.getenv("GENAI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=API_KEY)
 
 model = genai.GenerativeModel("gemini-2.5-flash")
@@ -222,6 +219,8 @@ def run_hotkey_loop():
 
 if __name__ == "__main__":
     try:
+        if not API_KEY:
+            raise RuntimeError("GENAI_API_KEY (or GOOGLE_API_KEY) environment variable not set.\nSet it before running: setx GENAI_API_KEY \"your_key\" and restart the app.")
         run_hotkey_loop()
     except Exception as e:
         log(traceback.format_exc())

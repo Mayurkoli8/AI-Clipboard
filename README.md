@@ -6,8 +6,8 @@ This repository contains two variants of an "AI Clipboard" helper:
 - `ai_clipboard_offline.py` — uses a local LLM endpoint (OLLAMA) and a hotkey.
 
 Safety notes
-- `ai_clipboard_online.py` currently uses a personal hardcoded API key.
-- Do not use a hardcoded key in a public/shared repo. If an API key was ever pushed publicly, rotate/revoke it before relying on it.
+- `ai_clipboard_online.py` reads the API key from the `GENAI_API_KEY` (or `GOOGLE_API_KEY`) environment variable.
+- Never hardcode a key in this repo. Google automatically blocks keys found in public repos ("403 Your API key was reported as leaked").
 
 Quick workflow
 1. Set your API key in PowerShell (persistent):
